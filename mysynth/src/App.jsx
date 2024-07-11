@@ -1,17 +1,14 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import Synthesizer from './Components/Synthesizer.jsx'
-import './App.css'
+// src/App.js
+import React from 'react';
+import Synthesizer from './Components/Synthesizer.jsx';
 
-function App() {
-  const [count, setCount] = useState(0)
-
+const App = () => {
   return (
-    <>
+    <div>
+      <h1 style={{ textAlign: 'center', color: '#ffffff' }}>Advanced Synthesizer</h1>
+      <Synthesizer />
+    </div>
+  );
+};
 
-<Synthesizer />
-    </>
-  )
-}
-
-export default App
+export default App;

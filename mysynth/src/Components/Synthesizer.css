@@ -1,0 +1,88 @@
+/* src/components/Synthesizer.css */
+.synthesizer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(to bottom right, #1e1e1e, #3e3e3e);
+    color: #ffffff;
+    font-family: 'Arial', sans-serif;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  
+  .controls label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 10px;
+    font-size: 14px;
+  }
+  
+  .controls select,
+  .controls input[type="range"] {
+    margin-top: 5px;
+    width: 100px;
+  }
+  
+  .keyboard {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  
+  .keyboard button {
+    background: #4e4e4e;
+    border: none;
+    border-radius: 5px;
+    margin: 0 5px;
+    padding: 10px 20px;
+    color: #ffffff;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+  .keyboard button:hover {
+    background: #6e6e6e;
+  }
+  
+  .recording {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+  
+  .recording button {
+    background: #d9534f;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    color: #ffffff;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+  .recording button:hover {
+    background: #c9302c;
+  }
+  
+  .recording button:nth-child(2) {
+    background: #5cb85c;
+  }
+  
+  .recording button:nth-child(2):hover {
+    background: #4cae4c;
+  }
+  
