@@ -12,7 +12,12 @@ const Synthesizer = () => {
     envelopeAttack: 0.1,
     envelopeDecay: 0.2,
     envelopeSustain: 0.5,
-    envelopeRelease: 1
+    envelopeRelease: 1,
+    filterFrequency: 350,
+    filterQ: 1,
+    filterType: 'lowpass',
+    filterGain: 0,
+    octave: 4,
   });
   const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)());
   const mediaRecorder = useRef(null);
@@ -27,6 +32,12 @@ const Synthesizer = () => {
         sustain: settings.envelopeSustain,
         release: settings.envelopeRelease,
       },
+      filter: {
+        frequency: settings.filterFrequency,
+        Q: settings.filterQ,
+        type: settings.filterType,
+        gain: settings.filterGain,
+      },
     }).toDestination();
     setSynth(updatedSynth);
 
@@ -37,6 +48,16 @@ const Synthesizer = () => {
         });
       });
     }
+
+    // Event listeners for keyboard interaction
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      // Cleanup: Remove event listeners
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [settings]);
 
   const handleMIDIMessage = (message) => {
@@ -46,6 +67,20 @@ const Synthesizer = () => {
       synth.triggerAttack(Tone.Frequency(note, 'midi').toNote());
     } else if (command === 128) {
       synth.triggerRelease(Tone.Frequency(note, 'midi').toNote());
+    }
+  };
+
+  const handleKeyDown = (event) => {
+    const note = getNoteFromKeyCode(event.keyCode);
+    if (note) {
+      synth.triggerAttack(getNoteWithOctave(note));
+    }
+  };
+
+  const handleKeyUp = (event) => {
+    const note = getNoteFromKeyCode(event.keyCode);
+    if (note) {
+      synth.triggerRelease(getNoteWithOctave(note));
     }
   };
 
@@ -101,12 +136,41 @@ const Synthesizer = () => {
     setSettings({ ...settings, [name]: parseFloat(value) });
   };
 
+  const handleOctaveChange = (direction) => {
+    setSettings((prevState) => ({
+      ...prevState,
+      octave: direction === 'up' ? prevState.octave + 1 : prevState.octave - 1,
+    }));
+  };
+
+  const getNoteWithOctave = (note) => {
+    const noteBase = note.slice(0, -1);
+    return `${noteBase}${settings.octave}`;
+  };
+
+  const getNoteFromKeyCode = (keyCode) => {
+    switch (keyCode) {
+      case 65: return 'C';
+      case 83: return 'D';
+      case 68: return 'E';
+      case 70: return 'F';
+      case 71: return 'G';
+      case 72: return 'A';
+      case 74: return 'B';
+      case 75: return 'C#';
+      case 76: return 'D#';
+      case 186: return 'F#';
+      case 222: return 'G#';
+      default: return null;
+    }
+  };
+
   return (
     <div className="synthesizer">
       <div className="controls">
         <label>
           Oscillator Type:
-          <select name="oscillatorType" onChange={(e) => setSettings({ ...settings, oscillatorType: e.target.value })}>
+          <select name="oscillatorType" value={settings.oscillatorType} onChange={handleSettingChange}>
             <option value="sine">Sine</option>
             <option value="square">Square</option>
             <option value="triangle">Triangle</option>
@@ -129,11 +193,48 @@ const Synthesizer = () => {
           Release:
           <input type="range" name="envelopeRelease" min="0" max="5" step="0.01" value={settings.envelopeRelease} onChange={handleSettingChange} />
         </label>
+        <label>
+          Filter Frequency:
+          <input type="range" name="filterFrequency" min="20" max="20000" step="1" value={settings.filterFrequency} onChange={handleSettingChange} />
+        </label>
+        <label>
+          Filter Q:
+          <input type="range" name="filterQ" min="0.1" max="20" step="0.1" value={settings.filterQ} onChange={handleSettingChange} />
+        </label>
+        <label>
+          Filter Type:
+          <select name="filterType" value={settings.filterType} onChange={handleSettingChange}>
+            <option value="lowpass">Lowpass</option>
+            <option value="highpass">Highpass</option>
+            <option value="bandpass">Bandpass</option>
+            <option value="lowshelf">Lowshelf</option>
+            <option value="highshelf">Highshelf</option>
+            <option value="peaking">Peaking</option>
+            <option value="notch">Notch</option>
+            <option value="allpass">Allpass</option>
+          </select>
+        </label>
+        <label>
+          Filter Gain:
+          <input type="range" name="filterGain" min="-40" max="40" step="1" value={settings.filterGain} onChange={handleSettingChange} />
+        </label>
+        <div className="octave-control">
+          <button onClick={() => handleOctaveChange('down')}>Octave Down</button>
+          <span>Octave: {settings.octave}</span>
+          <button onClick={() => handleOctaveChange('up')}>Octave Up</button>
+        </div>
       </div>
       <div className="keyboard">
-        <button onClick={() => synth.triggerAttackRelease('C4', '8n')}>C4</button>
-        <button onClick={() => synth.triggerAttackRelease('D4', '8n')}>D4</button>
-        <button onClick={() => synth.triggerAttackRelease('E4', '8n')}>E4</button>
+        {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note) => (
+          <button key={note}
+            onMouseDown={() => synth.triggerAttack(getNoteWithOctave(`${note}${settings.octave}`))}
+            onMouseUp={() => synth.triggerRelease(getNoteWithOctave(`${note}${settings.octave}`))}
+            onTouchStart={() => synth.triggerAttack(getNoteWithOctave(`${note}${settings.octave}`))}
+            onTouchEnd={() => synth.triggerRelease(getNoteWithOctave(`${note}${settings.octave}`))}
+          >
+            {`${note}${settings.octave}`}
+          </button>
+        ))}
       </div>
       <div className="recording">
         <button onClick={startRecording}>Start Recording</button>
