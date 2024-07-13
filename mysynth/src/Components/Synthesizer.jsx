@@ -1,4 +1,3 @@
-// src/components/Synthesizer.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 import { saveAs } from 'file-saver';
@@ -6,7 +5,6 @@ import lamejs from 'lamejs';
 import './Synthesizer.css';
 
 const Synthesizer = () => {
-  const [synth, setSynth] = useState(new Tone.Synth().toDestination());
   const [settings, setSettings] = useState({
     oscillatorType: 'sine',
     envelopeAttack: 0.1,
@@ -19,74 +17,93 @@ const Synthesizer = () => {
     filterGain: 0,
     octave: 4,
   });
-  const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)());
+
+  const audioContext = useRef(null);
   const mediaRecorder = useRef(null);
   const audioChunks = useRef([]);
+  const activeNotes = useRef(new Set());
+  const synth = useRef(null);
 
   useEffect(() => {
-    const updatedSynth = new Tone.Synth({
-      oscillator: { type: settings.oscillatorType },
-      envelope: {
-        attack: settings.envelopeAttack,
-        decay: settings.envelopeDecay,
-        sustain: settings.envelopeSustain,
-        release: settings.envelopeRelease,
-      },
-      filter: {
-        frequency: settings.filterFrequency,
-        Q: settings.filterQ,
-        type: settings.filterType,
-        gain: settings.filterGain,
-      },
-    }).toDestination();
-    setSynth(updatedSynth);
-
-    if (navigator.requestMIDIAccess) {
-      navigator.requestMIDIAccess().then((midiAccess) => {
-        midiAccess.inputs.forEach((input) => {
-          input.onmidimessage = handleMIDIMessage;
-        });
+    // Initialize synth and audio context on component mount
+    if (!synth.current) {
+      synth.current = new Tone.Synth({
+        oscillator: { type: settings.oscillatorType },
+        envelope: {
+          attack: settings.envelopeAttack,
+          decay: settings.envelopeDecay,
+          sustain: settings.envelopeSustain,
+          release: settings.envelopeRelease,
+        },
+        filter: {
+          frequency: settings.filterFrequency,
+          Q: settings.filterQ,
+          type: settings.filterType,
+          gain: settings.filterGain,
+        },
+      }).toDestination();
+    } else {
+      // Update synth settings if they change
+      synth.current.set({
+        oscillator: { type: settings.oscillatorType },
+        envelope: {
+          attack: settings.envelopeAttack,
+          decay: settings.envelopeDecay,
+          sustain: settings.envelopeSustain,
+          release: settings.envelopeRelease,
+        },
+        filter: {
+          frequency: settings.filterFrequency,
+          Q: settings.filterQ,
+          type: settings.filterType,
+          gain: settings.filterGain,
+        },
       });
     }
 
-    // Event listeners for keyboard interaction
+    // Ensure Tone.js context is started
+    if (Tone.context.state !== 'running') {
+      Tone.start();
+    }
+
+    // Event listeners for keyboard input
+    const handleKeyDown = (event) => {
+      const note = getNoteFromKeyCode(event.keyCode);
+      if (note && synth.current && !activeNotes.current.has(note)) {
+        activeNotes.current.add(note);
+        synth.current.triggerAttack(getNoteWithOctave(note));
+      }
+    };
+
+    const handleKeyUp = (event) => {
+      const note = getNoteFromKeyCode(event.keyCode);
+      if (note && synth.current && activeNotes.current.has(note)) {
+        activeNotes.current.delete(note);
+        synth.current.triggerRelease(getNoteWithOctave(note));
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
     return () => {
-      // Cleanup: Remove event listeners
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [settings]);
 
-  const handleMIDIMessage = (message) => {
-    const [command, note, velocity] = message.data;
-
-    if (command === 144) {
-      synth.triggerAttack(Tone.Frequency(note, 'midi').toNote());
-    } else if (command === 128) {
-      synth.triggerRelease(Tone.Frequency(note, 'midi').toNote());
-    }
-  };
-
-  const handleKeyDown = (event) => {
-    const note = getNoteFromKeyCode(event.keyCode);
-    if (note) {
-      synth.triggerAttack(getNoteWithOctave(note));
-    }
-  };
-
-  const handleKeyUp = (event) => {
-    const note = getNoteFromKeyCode(event.keyCode);
-    if (note) {
-      synth.triggerRelease(getNoteWithOctave(note));
+  const initializeAudioContext = () => {
+    if (!audioContext.current) {
+      audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
+    } else if (audioContext.current.state === 'suspended') {
+      audioContext.current.resume();
     }
   };
 
   const startRecording = () => {
+    initializeAudioContext();
     const streamDestination = audioContext.current.createMediaStreamDestination();
-    synth.connect(streamDestination);
+    synth.current.connect(streamDestination);
     mediaRecorder.current = new MediaRecorder(streamDestination.stream);
 
     mediaRecorder.current.ondataavailable = (event) => {
@@ -107,7 +124,9 @@ const Synthesizer = () => {
   };
 
   const stopRecording = () => {
-    mediaRecorder.current.stop();
+    if (mediaRecorder.current) {
+      mediaRecorder.current.stop();
+    }
   };
 
   const convertToMp3 = (wavBuffer) => {
@@ -144,8 +163,7 @@ const Synthesizer = () => {
   };
 
   const getNoteWithOctave = (note) => {
-    const noteBase = note.slice(0, -1);
-    return `${noteBase}${settings.octave}`;
+    return `${note}${settings.octave}`;
   };
 
   const getNoteFromKeyCode = (keyCode) => {
@@ -226,11 +244,28 @@ const Synthesizer = () => {
       </div>
       <div className="keyboard">
         {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note) => (
-          <button key={note}
-            onMouseDown={() => synth.triggerAttack(getNoteWithOctave(`${note}${settings.octave}`))}
-            onMouseUp={() => synth.triggerRelease(getNoteWithOctave(`${note}${settings.octave}`))}
-            onTouchStart={() => synth.triggerAttack(getNoteWithOctave(`${note}${settings.octave}`))}
-            onTouchEnd={() => synth.triggerRelease(getNoteWithOctave(`${note}${settings.octave}`))}
+          <button
+            key={note}
+            onMouseDown={() => {
+              if (synth.current) {
+                synth.current.triggerAttack(getNoteWithOctave(note));
+              }
+            }}
+            onMouseUp={() => {
+              if (synth.current) {
+                synth.current.triggerRelease(getNoteWithOctave(note));
+              }
+            }}
+            onTouchStart={() => {
+              if (synth.current) {
+                synth.current.triggerAttack(getNoteWithOctave(note));
+              }
+            }}
+            onTouchEnd={() => {
+              if (synth.current) {
+                synth.current.triggerRelease(getNoteWithOctave(note));
+              }
+            }}
           >
             {`${note}${settings.octave}`}
           </button>
